@@ -254,20 +254,7 @@ pub mod receiver {
             return false;
         }
 
-        fn process_latency(&mut self, timestamp:&NaiveDateTime, history:&mut UdpReceiverIntervalHistory) {
-            let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("system time before UNIX epoch");
-            let current_timestamp = NaiveDateTime::from_timestamp(now.as_secs() as i64, now.subsec_nanos());
-            let time_delta = current_timestamp - *timestamp;
-            let time_delta_nanoseconds = match time_delta.num_nanoseconds() {
-                Some(ns) => ns,
-                None => {
-                    log::warn!("sender and receiver clocks are too out-of-sync to calculate latency");
-                    return;
-                },
-            };
-            
-            if history.unbroken_sequence > 1 { //do calculation
-                let delta_seconds = (time_delta_nanoseconds - history.previous_time_delta_nanoseconds).abs() as f64 / 1_000_000_000.00;
+        fn process_latency(&mut self, delta_seconds:f64, history:&mut UdpReceiverIntervalHistory) {
                 history.packet_unbroken += 1;
                 history.latency_sum_seconds += delta_seconds;
                 history.latency_max_seconds = history.latency_max_seconds.max(delta_seconds);
@@ -276,30 +263,15 @@ pub mod receiver {
                 } else {
                     history.latency_min_seconds = history.latency_max_seconds.min(delta_seconds);
                 }
-            }
         }
         
-        fn process_jitter(&mut self, timestamp:&NaiveDateTime, history:&mut UdpReceiverIntervalHistory) {
+        fn process_jitter(&mut self, delta_seconds:f64, time_delta_nanoseconds:i64, history:&mut UdpReceiverIntervalHistory) {
+            let delta_seconds: f32 = delta_seconds as f32;
             /* this is a pretty straightforward implementation of RFC 1889, Appendix 8
              * it works on an assumption that the timestamp delta between sender and receiver
              * will remain effectively constant during the testing window
              */
-            let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("system time before UNIX epoch");
-            let current_timestamp = NaiveDateTime::from_timestamp(now.as_secs() as i64, now.subsec_nanos());
-            
-            let time_delta = current_timestamp - *timestamp;
-            
-            let time_delta_nanoseconds = match time_delta.num_nanoseconds() {
-                Some(ns) => ns,
-                None => {
-                    log::warn!("sender and receiver clocks are too out-of-sync to calculate jitter");
-                    return;
-                },
-            };
-            
             if history.unbroken_sequence > 1 { //do jitter calculation
-                let delta_seconds = (time_delta_nanoseconds - history.previous_time_delta_nanoseconds).abs() as f32 / 1_000_000_000.00;
-                
                 if history.unbroken_sequence > 2 { //normal jitter-calculation, per the RFC
                     let mut jitter_seconds = history.jitter_seconds.unwrap(); //since we have a chain, this won't be None
                     jitter_seconds += (delta_seconds - jitter_seconds) / 16.0;
@@ -332,8 +304,21 @@ pub mod receiver {
                 let source_timestamp = NaiveDateTime::from_timestamp(origin_seconds, origin_nanoseconds);
                 
                 history.unbroken_sequence += 1;
-                self.process_latency(&source_timestamp, &mut history);
-                self.process_jitter(&source_timestamp, &mut history);
+                let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("system time before UNIX epoch");
+                let current_timestamp = NaiveDateTime::from_timestamp(now.as_secs() as i64, now.subsec_nanos());
+                let time_delta = current_timestamp - source_timestamp;
+                match time_delta.num_nanoseconds() {
+                    Some(ns) => {
+                        let delta_seconds = (ns - history.previous_time_delta_nanoseconds).abs() as f64 / 1_000_000_000.00;
+                        self.process_latency(delta_seconds, &mut history);
+                        if history.unbroken_sequence > 1 { //do calculation
+                            self.process_jitter(delta_seconds, ns, &mut history);
+                        }
+                    },
+                    None => {
+                        log::warn!("sender and receiver clocks are too out-of-sync to calculate latency");
+                    },
+                };
                 
                 if history.unbroken_sequence > history.longest_unbroken_sequence {
                     history.longest_unbroken_sequence = history.unbroken_sequence;
