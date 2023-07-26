@@ -393,6 +393,11 @@ pub mod receiver {
             packet: &[u8],
             mut history: &mut UdpReceiverIntervalHistory,
         ) -> bool {
+            // reduce time lag between recv and Time::Now for better latency measure
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time before UNIX epoch");
+
             //the first sixteen bytes are the test's ID
             if packet[0..16] != self.test_definition.test_id {
                 return false;
@@ -413,9 +418,6 @@ pub mod receiver {
                     NaiveDateTime::from_timestamp(origin_seconds, origin_nanoseconds);
 
                 history.unbroken_sequence += 1;
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("system time before UNIX epoch");
                 let current_timestamp =
                     NaiveDateTime::from_timestamp(now.as_secs() as i64, now.subsec_nanos());
                 let time_delta = current_timestamp - source_timestamp;
