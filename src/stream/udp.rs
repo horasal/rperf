@@ -250,7 +250,6 @@ pub mod receiver {
         longest_jitter_seconds: Option<f32>,
         previous_time_delta_nanoseconds: i64,
 
-        packet_unbroken: u64,
         latency_sum_seconds: f64,
         latency_max_seconds: f64,
         latency_min_seconds: f64,
@@ -349,7 +348,6 @@ pub mod receiver {
             if history.unbroken_sequence > 1 {
                 //do jitter calculation
                 let delta_seconds = time_delta_nanoseconds.abs() as f64 / 1_000_000_000.00;
-                history.packet_unbroken += 1;
                 history.latency_sum_seconds += delta_seconds;
                 history.latency_max_seconds = history.latency_max_seconds.max(delta_seconds);
                 if history.latency_min_seconds < 0.0 {
@@ -465,7 +463,6 @@ pub mod receiver {
                 longest_jitter_seconds: None,
                 previous_time_delta_nanoseconds: 0,
 
-                packet_unbroken: 0,
                 latency_max_seconds: 0.0,
                 latency_min_seconds: -1.0,
                 latency_sum_seconds: 0.0,
@@ -525,7 +522,7 @@ pub mod receiver {
                                         jitter_seconds: history.longest_jitter_seconds,
 
                                         latency_avg_seconds: history.latency_sum_seconds
-                                            / (history.packet_unbroken as f64),
+                                            / (history.unbroken_sequence as f64),
                                         latency_max_seconds: history.latency_max_seconds,
                                         latency_min_seconds: history.latency_min_seconds,
                                     })));
@@ -567,7 +564,7 @@ pub mod receiver {
                     jitter_seconds: history.longest_jitter_seconds,
 
                     latency_avg_seconds: history.latency_sum_seconds
-                        / (history.packet_unbroken as f64),
+                        / (history.unbroken_sequence as f64),
                     latency_min_seconds: history.latency_min_seconds,
                     latency_max_seconds: history.latency_max_seconds,
                 })))
