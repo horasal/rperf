@@ -1203,6 +1203,7 @@ impl TestResults for UdpTestResults {
         let mut latency_avg: f64 = 0.0;
         let mut latency_min: f64 = -1.0;
         let mut latency_max: f64 = 0.0;
+        let mut latency_thunk: u64 = 0;
 
         let mut streams = Vec::with_capacity(self.stream_results.len());
         for (idx, stream) in self.stream_results.iter() {
@@ -1243,6 +1244,7 @@ impl TestResults for UdpTestResults {
                     jitter_calculated = true;
                 }
                 latency_avg += rr.latency_avg_seconds;
+                latency_thunk += 1;
                 if latency_min < 0.0 {
                     latency_min = rr.latency_min_seconds;
                 } else {
@@ -1250,9 +1252,8 @@ impl TestResults for UdpTestResults {
                 }
                 latency_max = latency_max.max(rr.latency_max_seconds);
             }
-
-            latency_avg = latency_avg / (stream.receive_results.len() as f64);
         }
+        latency_avg = latency_avg / (latency_thunk as f64);
 
         let mut summary = serde_json::json!({
             "duration_send": duration_send,
@@ -1321,6 +1322,7 @@ impl TestResults for UdpTestResults {
         let mut latency_avg: f64 = 0.0;
         let mut latency_min: f64 = -1.0;
         let mut latency_max: f64 = 0.0;
+        let mut latency_thunk: u64 = 0;
 
         for (stream_idx, stream) in self.stream_results.values().enumerate() {
             for (i, sr) in stream.send_results.iter().enumerate() {
@@ -1358,6 +1360,7 @@ impl TestResults for UdpTestResults {
                     jitter_calculated = true;
                 }
                 latency_avg += rr.latency_avg_seconds;
+                latency_thunk += 1;
                 if latency_min < 0.0 {
                     latency_min = rr.latency_min_seconds;
                 } else {
@@ -1365,9 +1368,9 @@ impl TestResults for UdpTestResults {
                 }
                 latency_max = latency_max.max(rr.latency_max_seconds);
             }
-
-            latency_avg = latency_avg / (stream.receive_results.len() as f64);
         }
+        latency_avg = latency_avg / (latency_thunk as f64);
+
         stream_send_durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
         stream_receive_durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
