@@ -324,6 +324,10 @@ pub struct UdpReceiveResult {
     
     pub unbroken_sequence: u64,
     pub jitter_seconds: Option<f32>,
+
+    pub latency_avg_seconds: f64,
+    pub latency_min_seconds: f64,
+    pub latency_max_seconds: f64,
 }
 impl UdpReceiveResult {
     fn from_json(value:serde_json::Value) -> BoxResult<UdpReceiveResult> {
@@ -379,6 +383,7 @@ impl IntervalResult for UdpReceiveResult {
         if self.jitter_seconds.is_some() {
             output.push_str(&format!("\njitter: {:.6}s over {} consecutive packets", self.jitter_seconds.unwrap(), self.unbroken_sequence));
         }
+        output.push_str(&format!("\nLatency: Avg. {:.6}, Max.: {:.6}, Min.: {:.6} ", self.latency_avg_seconds, self.latency_max_seconds, self.latency_min_seconds));
         output
     }
 }

@@ -188,6 +188,11 @@ pub mod receiver {
         longest_unbroken_sequence: u64,
         longest_jitter_seconds: Option<f32>,
         previous_time_delta_nanoseconds: i64,
+
+        packet_unbroken: u64,
+        latency_sum_seconds: f64,
+        latency_max_seconds: f64,
+        latency_min_seconds: f64,
     }
     
     pub struct UdpReceiver {
@@ -248,6 +253,27 @@ pub mod receiver {
             }
             return false;
         }
+
+        fn process_latency(&mut self, timestamp:&NaiveDateTime, history:&mut UdpReceiverIntervalHistory) {
+            let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("system time before UNIX epoch");
+            let current_timestamp = NaiveDateTime::from_timestamp(now.as_secs() as i64, now.subsec_nanos());
+            let time_delta = current_timestamp - *timestamp;
+            let time_delta_nanoseconds = match time_delta.num_nanoseconds() {
+                Some(ns) => ns,
+                None => {
+                    log::warn!("sender and receiver clocks are too out-of-sync to calculate latency");
+                    return;
+                },
+            };
+            
+            if history.unbroken_sequence > 1 { //do calculation
+                let delta_seconds = (time_delta_nanoseconds - history.previous_time_delta_nanoseconds).abs() as f64 / 1_000_000_000.00;
+                history.packet_unbroken += 1;
+                history.latency_sum_seconds += delta_seconds;
+                history.latency_max_seconds = history.latency_max_seconds.max(delta_seconds);
+                history.latency_min_seconds = history.latency_max_seconds.min(delta_seconds);
+            }
+        }
         
         fn process_jitter(&mut self, timestamp:&NaiveDateTime, history:&mut UdpReceiverIntervalHistory) {
             /* this is a pretty straightforward implementation of RFC 1889, Appendix 8
@@ -302,6 +328,7 @@ pub mod receiver {
                 let source_timestamp = NaiveDateTime::from_timestamp(origin_seconds, origin_nanoseconds);
                 
                 history.unbroken_sequence += 1;
+                self.process_latency(&source_timestamp, &mut history);
                 self.process_jitter(&source_timestamp, &mut history);
                 
                 if history.unbroken_sequence > history.longest_unbroken_sequence {
@@ -333,6 +360,11 @@ pub mod receiver {
                 longest_unbroken_sequence: 0,
                 longest_jitter_seconds: None,
                 previous_time_delta_nanoseconds: 0,
+
+                packet_unbroken: 0,
+                latency_max_seconds: 0.0,
+                latency_min_seconds: 0.0,
+                latency_sum_seconds: 0.0,
             };
             
             let start = Instant::now();
@@ -379,6 +411,10 @@ pub mod receiver {
                                         
                                         unbroken_sequence: history.longest_unbroken_sequence,
                                         jitter_seconds: history.longest_jitter_seconds,
+
+                                        latency_avg_seconds: history.latency_sum_seconds / (history.packet_unbroken as f64),
+                                        latency_max_seconds: history.latency_max_seconds,
+                                        latency_min_seconds: history.latency_min_seconds,
                                     })))
                                 }
                             } else {
@@ -411,6 +447,10 @@ pub mod receiver {
                     
                     unbroken_sequence: history.longest_unbroken_sequence,
                     jitter_seconds: history.longest_jitter_seconds,
+
+                    latency_avg_seconds: history.latency_sum_seconds / (history.packet_unbroken as f64),
+                    latency_min_seconds: history.latency_min_seconds,
+                    latency_max_seconds: history.latency_max_seconds,
                 })))
             } else {
                 None
