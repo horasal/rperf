@@ -254,23 +254,24 @@ pub mod receiver {
             return false;
         }
 
-        fn process_latency(&mut self, delta_seconds:f64, history:&mut UdpReceiverIntervalHistory) {
-                history.packet_unbroken += 1;
-                history.latency_sum_seconds += delta_seconds;
-                history.latency_max_seconds = history.latency_max_seconds.max(delta_seconds);
-                if history.latency_min_seconds < 0.0 {
-                    history.latency_min_seconds = delta_seconds;
-                } else {
-                    history.latency_min_seconds = history.latency_max_seconds.min(delta_seconds);
-                }
+        fn process_latency(&mut self, time_delta_nanoseconds:i64, history:&mut UdpReceiverIntervalHistory) {
+            let delta_seconds = time_delta_nanoseconds.abs() as f64 / 1_000_000_000.00;
+            history.packet_unbroken += 1;
+            history.latency_sum_seconds += delta_seconds;
+            history.latency_max_seconds = history.latency_max_seconds.max(delta_seconds);
+            if history.latency_min_seconds < 0.0 {
+                history.latency_min_seconds = delta_seconds;
+            } else {
+                history.latency_min_seconds = history.latency_max_seconds.min(delta_seconds);
+            }
         }
         
-        fn process_jitter(&mut self, delta_seconds:f64, time_delta_nanoseconds:i64, history:&mut UdpReceiverIntervalHistory) {
-            let delta_seconds: f32 = delta_seconds as f32;
+        fn process_jitter(&mut self, time_delta_nanoseconds:i64, history:&mut UdpReceiverIntervalHistory) {
             /* this is a pretty straightforward implementation of RFC 1889, Appendix 8
              * it works on an assumption that the timestamp delta between sender and receiver
              * will remain effectively constant during the testing window
              */
+            let delta_seconds = (time_delta_nanoseconds - history.previous_time_delta_nanoseconds).abs() as f32 / 1_000_000_000.00;
             if history.unbroken_sequence > 1 { //do jitter calculation
                 if history.unbroken_sequence > 2 { //normal jitter-calculation, per the RFC
                     let mut jitter_seconds = history.jitter_seconds.unwrap(); //since we have a chain, this won't be None
@@ -309,11 +310,8 @@ pub mod receiver {
                 let time_delta = current_timestamp - source_timestamp;
                 match time_delta.num_nanoseconds() {
                     Some(ns) => {
-                        let delta_seconds = (ns - history.previous_time_delta_nanoseconds).abs() as f64 / 1_000_000_000.00;
-                        self.process_latency(delta_seconds, &mut history);
-                        if history.unbroken_sequence > 1 { //do calculation
-                            self.process_jitter(delta_seconds, ns, &mut history);
-                        }
+                        self.process_latency(ns, &mut history);
+                        self.process_jitter(ns, &mut history);
                     },
                     None => {
                         log::warn!("sender and receiver clocks are too out-of-sync to calculate latency");
