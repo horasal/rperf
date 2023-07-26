@@ -381,9 +381,9 @@ impl IntervalResult for UdpReceiveResult {
                                 self.packets_received, self.packets_lost, self.packets_out_of_order, self.packets_duplicated, self.packets_received as f32 / duration_divisor,
         );
         if self.jitter_seconds.is_some() {
-            output.push_str(&format!("\njitter: {:.6}s over {} consecutive packets", self.jitter_seconds.unwrap(), self.unbroken_sequence));
+            output.push_str(&format!("\njitter: {:.12}s over {} consecutive packets", self.jitter_seconds.unwrap(), self.unbroken_sequence));
         }
-        output.push_str(&format!("\nLatency: Avg. {:.6}, Max.: {:.6}, Min.: {:.6} ", self.latency_avg_seconds, self.latency_max_seconds, self.latency_min_seconds));
+        output.push_str(&format!("\nLatency: Avg. {:.12}, Max.: {:.12}, Min.: {:.12} ", self.latency_avg_seconds, self.latency_max_seconds, self.latency_min_seconds));
         output
     }
 }
@@ -603,6 +603,10 @@ impl StreamResults for UdpStreamResults {
         let mut jitter_calculated = false;
         let mut unbroken_sequence_count:u64 = 0;
         let mut jitter_weight:f64 = 0.0;
+
+        let mut latency_avg: f64 = 0.0;
+        let mut latency_min: f64 = -1.0;
+        let mut latency_max: f64 = 0.0;
         
         for (i, sr) in self.send_results.iter().enumerate() {
             if i < omit_seconds {
@@ -633,7 +637,17 @@ impl StreamResults for UdpStreamResults {
                 
                 jitter_calculated = true;
             }
+
+            latency_avg += rr.latency_avg_seconds;
+            if latency_min < 0.0 {
+                latency_min = rr.latency_min_seconds;
+            } else {
+                latency_min = latency_min.min(rr.latency_min_seconds);
+            }
+            latency_max = latency_max.max(rr.latency_max_seconds);
         }
+
+        latency_avg = latency_avg / (self.receive_results.len() as f64);
         
         let mut summary = serde_json::json!({
             "duration_send": duration_send,
@@ -649,6 +663,10 @@ impl StreamResults for UdpStreamResults {
             "packets_lost": packets_sent - packets_received,
             "packets_out_of_order": packets_out_of_order,
             "packets_duplicated": packets_duplicated,
+
+            "latency_avg": latency_avg,
+            "latency_min": latency_min,
+            "latency_max": latency_max,
         });
         if packets_sent > 0 {
             summary["framed_packet_size"] = serde_json::json!(bytes_sent / packets_sent);
@@ -1008,6 +1026,10 @@ impl TestResults for UdpTestResults {
         let mut jitter_calculated = false;
         let mut unbroken_sequence_count:u64 = 0;
         let mut jitter_weight:f64 = 0.0;
+
+        let mut latency_avg:f64 = 0.0;
+        let mut latency_min:f64 = -1.0;
+        let mut latency_max: f64 = 0.0;
         
         
         let mut streams = Vec::with_capacity(self.stream_results.len());
@@ -1047,7 +1069,16 @@ impl TestResults for UdpTestResults {
                     
                     jitter_calculated = true;
                 }
+                latency_avg += rr.latency_avg_seconds;
+                if latency_min < 0.0 {
+                    latency_min = rr.latency_min_seconds;
+                } else {
+                    latency_min = latency_min.min(rr.latency_min_seconds);
+                }
+                latency_max = latency_max.max(rr.latency_max_seconds);
             }
+
+            latency_avg = latency_avg / (stream.receive_results.len() as f64);
         }
         
         let mut summary = serde_json::json!({
@@ -1064,6 +1095,10 @@ impl TestResults for UdpTestResults {
             "packets_lost": packets_sent - packets_received,
             "packets_out_of_order": packets_out_of_order,
             "packets_duplicated": packets_duplicated,
+
+            "latency_avg": latency_avg,
+            "latency_min": latency_min,
+            "latency_max": latency_max,
         });
         if packets_sent > 0 {
             summary["framed_packet_size"] = serde_json::json!(bytes_sent / packets_sent);
@@ -1109,6 +1144,10 @@ impl TestResults for UdpTestResults {
         let mut jitter_weight:f64 = 0.0;
         
         let mut sends_blocked = false;
+
+        let mut latency_avg: f64 = 0.0;
+        let mut latency_min: f64 = -1.0;
+        let mut latency_max: f64 = 0.0;
         
         for (stream_idx, stream) in self.stream_results.values().enumerate() {
             for (i, sr) in stream.send_results.iter().enumerate() {
@@ -1144,7 +1183,16 @@ impl TestResults for UdpTestResults {
                     
                     jitter_calculated = true;
                 }
+                latency_avg += rr.latency_avg_seconds;
+                if latency_min < 0.0 {
+                    latency_min = rr.latency_min_seconds;
+                } else {
+                    latency_min = latency_min.min(rr.latency_min_seconds);
+                }
+                latency_max = latency_max.max(rr.latency_max_seconds);
             }
+
+            latency_avg = latency_avg / (stream.receive_results.len() as f64);
         }
         stream_send_durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
         stream_receive_durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -1209,8 +1257,9 @@ impl TestResults for UdpTestResults {
                                 packets_received, packets_lost, (packets_lost as f64 / packets_sent_divisor) * 100.0, packets_out_of_order, packets_duplicated, (packets_received as f64 / receive_duration_divisor) * stream_count as f64,
         );
         if jitter_calculated {
-            output.push_str(&format!("\njitter: {:.6}s over {} consecutive packets", jitter_weight / (unbroken_sequence_count as f64), unbroken_sequence_count));
+            output.push_str(&format!("\njitter: {:.12}s over {} consecutive packets", jitter_weight / (unbroken_sequence_count as f64), unbroken_sequence_count));
         }
+        output.push_str(&format!("\nLatency Avg.: {:.12}, Max.: {:.12}, Min.: {:.12}", latency_avg, latency_max, latency_min));
         if sends_blocked {
             output.push_str(&format!("\nthroughput throttled by buffer limitations"));
         }

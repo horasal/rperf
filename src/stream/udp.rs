@@ -271,7 +271,11 @@ pub mod receiver {
                 history.packet_unbroken += 1;
                 history.latency_sum_seconds += delta_seconds;
                 history.latency_max_seconds = history.latency_max_seconds.max(delta_seconds);
-                history.latency_min_seconds = history.latency_max_seconds.min(delta_seconds);
+                if history.latency_min_seconds < 0.0 {
+                    history.latency_min_seconds = delta_seconds;
+                } else {
+                    history.latency_min_seconds = history.latency_max_seconds.min(delta_seconds);
+                }
             }
         }
         
@@ -363,7 +367,7 @@ pub mod receiver {
 
                 packet_unbroken: 0,
                 latency_max_seconds: 0.0,
-                latency_min_seconds: 0.0,
+                latency_min_seconds: -1.0,
                 latency_sum_seconds: 0.0,
             };
             
