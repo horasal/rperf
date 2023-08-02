@@ -253,6 +253,7 @@ pub mod receiver {
         latency_sum_seconds: f64,
         latency_max_seconds: f64,
         latency_min_seconds: f64,
+        latency: Vec<f64>,
     }
 
     pub struct UdpReceiver {
@@ -346,14 +347,14 @@ pub mod receiver {
             history: &mut UdpReceiverIntervalHistory,
         ) {
             if history.unbroken_sequence > 1 {
-                //do jitter calculation
                 let delta_seconds = time_delta_nanoseconds.abs() as f64 / 1_000_000_000.00;
+                history.latency.push(delta_seconds);
                 history.latency_sum_seconds += delta_seconds;
                 history.latency_max_seconds = history.latency_max_seconds.max(delta_seconds);
                 if history.latency_min_seconds < 0.0 {
                     history.latency_min_seconds = delta_seconds;
                 } else {
-                    history.latency_min_seconds = history.latency_max_seconds.min(delta_seconds);
+                    history.latency_min_seconds = history.latency_min_seconds.min(delta_seconds);
                 }
             }
         }
@@ -466,6 +467,7 @@ pub mod receiver {
                 latency_max_seconds: 0.0,
                 latency_min_seconds: -1.0,
                 latency_sum_seconds: 0.0,
+                latency: Vec::new(),
             };
 
             let start = Instant::now();
@@ -525,6 +527,7 @@ pub mod receiver {
                                             / (history.unbroken_sequence as f64),
                                         latency_max_seconds: history.latency_max_seconds,
                                         latency_min_seconds: history.latency_min_seconds,
+                                        latency: history.latency,
                                     })));
                                 }
                             } else {
@@ -567,6 +570,7 @@ pub mod receiver {
                         / (history.unbroken_sequence as f64),
                     latency_min_seconds: history.latency_min_seconds,
                     latency_max_seconds: history.latency_max_seconds,
+                    latency: history.latency,
                 })))
             } else {
                 None
