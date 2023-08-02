@@ -707,19 +707,21 @@ impl StreamResults for UdpStreamResults {
                     (rr.unbroken_sequence as f64) * (rr.jitter_seconds.unwrap() as f64);
                 unbroken_sequence_count += rr.unbroken_sequence;
 
+                latency_avg += rr.latency_avg_seconds * (rr.unbroken_sequence as f64);
+                if latency_min < 0.0 {
+                    latency_min = rr.latency_min_seconds;
+                } else {
+                    latency_min = latency_min.min(rr.latency_min_seconds);
+                }
+                latency_max = latency_max.max(rr.latency_max_seconds);
+
                 jitter_calculated = true;
             }
-
-            latency_avg += rr.latency_avg_seconds * (rr.unbroken_sequence as f64);
-            if latency_min < 0.0 {
-                latency_min = rr.latency_min_seconds;
-            } else {
-                latency_min = latency_min.min(rr.latency_min_seconds);
-            }
-            latency_max = latency_max.max(rr.latency_max_seconds);
         }
 
-        latency_avg = latency_avg / (unbroken_sequence_count as f64);
+        if jitter_calculated {
+            latency_avg = latency_avg / (unbroken_sequence_count as f64);
+        }
 
         let mut summary = serde_json::json!({
             "duration_send": duration_send,
@@ -1240,18 +1242,21 @@ impl TestResults for UdpTestResults {
                         (rr.unbroken_sequence as f64) * (rr.jitter_seconds.unwrap() as f64);
                     unbroken_sequence_count += rr.unbroken_sequence;
 
+                    latency_avg += rr.latency_avg_seconds * (rr.unbroken_sequence as f64);
+                    if latency_min < 0.0 {
+                        latency_min = rr.latency_min_seconds;
+                    } else {
+                        latency_min = latency_min.min(rr.latency_min_seconds);
+                    }
+                    latency_max = latency_max.max(rr.latency_max_seconds);
+
                     jitter_calculated = true;
                 }
-                latency_avg += rr.latency_avg_seconds * (rr.unbroken_sequence as f64);
-                if latency_min < 0.0 {
-                    latency_min = rr.latency_min_seconds;
-                } else {
-                    latency_min = latency_min.min(rr.latency_min_seconds);
-                }
-                latency_max = latency_max.max(rr.latency_max_seconds);
             }
         }
-        latency_avg = latency_avg / (unbroken_sequence_count as f64);
+        if jitter_calculated {
+            latency_avg = latency_avg / (unbroken_sequence_count as f64);
+        }
 
         let mut summary = serde_json::json!({
             "duration_send": duration_send,
@@ -1354,18 +1359,19 @@ impl TestResults for UdpTestResults {
                         (rr.unbroken_sequence as f64) * (rr.jitter_seconds.unwrap() as f64);
                     unbroken_sequence_count += rr.unbroken_sequence;
 
+                    latency_avg += rr.latency_avg_seconds * (rr.unbroken_sequence as f64);
+                    if latency_min < 0.0 {
+                        latency_min = rr.latency_min_seconds;
+                    } else {
+                        latency_min = latency_min.min(rr.latency_min_seconds);
+                    }
+                    latency_max = latency_max.max(rr.latency_max_seconds);
+
                     jitter_calculated = true;
                 }
-                latency_avg += rr.latency_avg_seconds * (rr.unbroken_sequence as f64);
-                if latency_min < 0.0 {
-                    latency_min = rr.latency_min_seconds;
-                } else {
-                    latency_min = latency_min.min(rr.latency_min_seconds);
-                }
-                latency_max = latency_max.max(rr.latency_max_seconds);
             }
         }
-        latency_avg = latency_avg / (unbroken_sequence_count as f64);
+        if jitter_calculated { latency_avg = latency_avg / (unbroken_sequence_count as f64);}
 
         stream_send_durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
         stream_receive_durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
