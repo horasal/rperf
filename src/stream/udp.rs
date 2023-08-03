@@ -465,7 +465,7 @@ pub mod receiver {
                 previous_time_delta_nanoseconds: 0,
 
                 latency_max_seconds: 0.0,
-                latency_min_seconds: -1.0,
+                latency_min_seconds: f64::NAN,
                 latency_sum_seconds: 0.0,
                 latency: Vec::new(),
             };
@@ -523,8 +523,8 @@ pub mod receiver {
                                         unbroken_sequence: history.longest_unbroken_sequence,
                                         jitter_seconds: history.longest_jitter_seconds,
 
-                                        latency_avg_seconds: history.latency_sum_seconds
-                                            / (history.unbroken_sequence as f64),
+                                        latency_avg_seconds: if history.unbroken_sequence>0 { history.latency_sum_seconds
+                                                / (history.unbroken_sequence as f64)} else { 0.0 },
                                         latency_max_seconds: history.latency_max_seconds,
                                         latency_min_seconds: history.latency_min_seconds,
                                         latency: history.latency,
@@ -566,8 +566,8 @@ pub mod receiver {
                     unbroken_sequence: history.longest_unbroken_sequence,
                     jitter_seconds: history.longest_jitter_seconds,
 
-                    latency_avg_seconds: history.latency_sum_seconds
-                        / (history.unbroken_sequence as f64),
+                    latency_avg_seconds: if history.unbroken_sequence>0 { history.latency_sum_seconds
+                        / (history.unbroken_sequence as f64)} else { 0.0 },
                     latency_min_seconds: history.latency_min_seconds,
                     latency_max_seconds: history.latency_max_seconds,
                     latency: history.latency,
