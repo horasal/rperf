@@ -341,7 +341,6 @@ pub struct UdpReceiveResult {
     pub latency_avg_seconds: f64,
     pub latency_min_seconds: f64,
     pub latency_max_seconds: f64,
-    pub latency: Vec<f64>,
 }
 impl UdpReceiveResult {
     fn from_json(value: serde_json::Value) -> BoxResult<UdpReceiveResult> {
@@ -677,7 +676,7 @@ impl StreamResults for UdpStreamResults {
         let mut jitter_weight: f64 = 0.0;
 
         let mut latency_avg: f64 = 0.0;
-        let mut latency_min: f64 = -1.0;
+        let mut latency_min: f64 = f64::INFINITY; 
         let mut latency_max: f64 = 0.0;
 
         for (i, sr) in self.send_results.iter().enumerate() {
@@ -709,12 +708,7 @@ impl StreamResults for UdpStreamResults {
                 unbroken_sequence_count += rr.unbroken_sequence;
 
                 latency_avg += rr.latency_avg_seconds * (rr.unbroken_sequence as f64);
-
-                if latency_min < 0.0 {
-                    latency_min = rr.latency_min_seconds;
-                } else {
-                    latency_min = latency_min.min(rr.latency_min_seconds);
-                }
+                latency_min = latency_min.min(rr.latency_min_seconds);
                 latency_max = latency_max.max(rr.latency_max_seconds);
 
                 jitter_calculated = true;
@@ -1210,7 +1204,7 @@ impl TestResults for UdpTestResults {
         let mut jitter_weight: f64 = 0.0;
 
         let mut latency_avg: f64 = 0.0;
-        let mut latency_min: f64 = -1.0;
+        let mut latency_min: f64 = f64::INFINITY;
         let mut latency_max: f64 = 0.0;
 
         let mut streams = Vec::with_capacity(self.stream_results.len());
@@ -1250,11 +1244,7 @@ impl TestResults for UdpTestResults {
                     unbroken_sequence_count += rr.unbroken_sequence;
 
                     latency_avg += rr.latency_avg_seconds * (rr.unbroken_sequence as f64);
-                    if latency_min < 0.0 {
-                        latency_min = rr.latency_min_seconds;
-                    } else {
-                        latency_min = latency_min.min(rr.latency_min_seconds);
-                    }
+                    latency_min = latency_min.min(rr.latency_min_seconds);
                     latency_max = latency_max.max(rr.latency_max_seconds);
                     
 
@@ -1331,7 +1321,7 @@ impl TestResults for UdpTestResults {
         let mut sends_blocked = false;
 
         let mut latency_avg: f64 = 0.0;
-        let mut latency_min: f64 = -1.0;
+        let mut latency_min: f64 = f64::INFINITY;
         let mut latency_max: f64 = 0.0;
 
         for (stream_idx, stream) in self.stream_results.values().enumerate() {
@@ -1368,11 +1358,7 @@ impl TestResults for UdpTestResults {
                     unbroken_sequence_count += rr.unbroken_sequence;
 
                     latency_avg += rr.latency_avg_seconds * (rr.unbroken_sequence as f64);
-                    if latency_min < 0.0 {
-                        latency_min = rr.latency_min_seconds;
-                    } else {
-                        latency_min = latency_min.min(rr.latency_min_seconds);
-                    }
+                    latency_min = latency_min.min(rr.latency_min_seconds);
                     latency_max = latency_max.max(rr.latency_max_seconds);
 
                     jitter_calculated = true;
@@ -1382,14 +1368,6 @@ impl TestResults for UdpTestResults {
         if jitter_calculated { 
             latency_avg = latency_avg / (unbroken_sequence_count as f64);
         }
-
-        let sum : Vec<f64> = self.stream_results.iter().flat_map(|(_, x)| x.receive_results.iter().flat_map(|x| x.latency.iter())).cloned().collect();
-        let count = sum.iter().count();
-        let latency_max_2 = sum.iter().fold(0.0/0.0, |f0, f| f.max(f0));
-        let latency_min_2 = sum.iter().fold(0.0/0.0, |f0, f| f.min(f0));
-
-        let sum: f64 = sum.iter().sum();
-        let latency_avg_2 = sum/(count as f64);
 
         stream_send_durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
         stream_receive_durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -1490,10 +1468,6 @@ impl TestResults for UdpTestResults {
         output.push_str(&format!(
             "\nLatency Avg.: {:.12}, Max.: {:.12}, Min.: {:.12}",
             latency_avg, latency_max, latency_min
-        ));
-        output.push_str(&format!(
-            "\n*2* Latency Avg.: {:.12}, Max.: {:.12}, Min.: {:.12}",
-            latency_avg_2, latency_max_2, latency_min_2
         ));
         if sends_blocked {
             output.push_str(&format!("\nthroughput throttled by buffer limitations"));

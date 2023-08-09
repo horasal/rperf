@@ -253,7 +253,6 @@ pub mod receiver {
         latency_sum_seconds: f64,
         latency_max_seconds: f64,
         latency_min_seconds: f64,
-        latency: Vec<f64>,
     }
 
     pub struct UdpReceiver {
@@ -304,7 +303,7 @@ pub mod receiver {
         fn process_packets_ordering(
             &mut self,
             packet_id: u64,
-            mut history: &mut UdpReceiverIntervalHistory,
+            history: &mut UdpReceiverIntervalHistory,
         ) -> bool {
             /* the algorithm from iperf3 provides a pretty decent approximation
              * for tracking lost and out-of-order packets efficiently, so it's
@@ -348,14 +347,9 @@ pub mod receiver {
         ) {
             if history.unbroken_sequence > 1 {
                 let delta_seconds = time_delta_nanoseconds.abs() as f64 / 1_000_000_000.00;
-                history.latency.push(delta_seconds);
                 history.latency_sum_seconds += delta_seconds;
                 history.latency_max_seconds = history.latency_max_seconds.max(delta_seconds);
-                if history.latency_min_seconds < 0.0 {
-                    history.latency_min_seconds = delta_seconds;
-                } else {
-                    history.latency_min_seconds = history.latency_min_seconds.min(delta_seconds);
-                }
+                history.latency_min_seconds = history.latency_min_seconds.min(delta_seconds);
             }
         }
 
@@ -414,11 +408,11 @@ pub mod receiver {
                 //and the following four are the number of nanoseconds since the UNIX epoch
                 let origin_nanoseconds = u32::from_be_bytes(packet[32..36].try_into().unwrap());
                 let source_timestamp =
-                    NaiveDateTime::from_timestamp(origin_seconds, origin_nanoseconds);
+                    NaiveDateTime::from_timestamp_opt(origin_seconds, origin_nanoseconds).unwrap();
 
                 history.unbroken_sequence += 1;
                 let current_timestamp =
-                    NaiveDateTime::from_timestamp(now.as_secs() as i64, now.subsec_nanos());
+                    NaiveDateTime::from_timestamp_opt(now.as_secs() as i64, now.subsec_nanos()).unwrap();
                 let time_delta = current_timestamp - source_timestamp;
                 match time_delta.num_nanoseconds() {
                     Some(ns) => {
@@ -465,9 +459,8 @@ pub mod receiver {
                 previous_time_delta_nanoseconds: 0,
 
                 latency_max_seconds: 0.0,
-                latency_min_seconds: f64::NAN,
+                latency_min_seconds: f64::INFINITY,
                 latency_sum_seconds: 0.0,
-                latency: Vec::new(),
             };
 
             let start = Instant::now();
@@ -527,7 +520,6 @@ pub mod receiver {
                                                 / (history.unbroken_sequence as f64)} else { 0.0 },
                                         latency_max_seconds: history.latency_max_seconds,
                                         latency_min_seconds: history.latency_min_seconds,
-                                        latency: history.latency,
                                     })));
                                 }
                             } else {
@@ -570,7 +562,6 @@ pub mod receiver {
                         / (history.unbroken_sequence as f64)} else { 0.0 },
                     latency_min_seconds: history.latency_min_seconds,
                     latency_max_seconds: history.latency_max_seconds,
-                    latency: history.latency,
                 })))
             } else {
                 None
